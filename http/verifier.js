@@ -1,9 +1,9 @@
 const get = require('simple-get')
 const { Verifier } = require('anon-creds')
 
-class VerifierHTTP {
+class VerifierHTTP extends Verifier {
   constructor (storage, issuerEndpoint) {
-    this.verifier = new Verifier(storage)
+    super(storage)
     this.issuerEndpoint = issuerEndpoint
   }
 
@@ -20,14 +20,14 @@ class VerifierHTTP {
     get.concat(options, (err, res, data) => {
       if (err) return cb(err)
 
-      this.verifier.registerCertification(Buffer.from(data), (err) => {
+      super.registerCertification(Buffer.from(data), (err) => {
         cb(err)
       })
     })
   }
 
   validate (transcript, cb) {
-    this.verifier.validate(transcript, (err, identifier) => {
+    super.validate(transcript, (err, identifier) => {
       if (err) return cb(err)
 
       var options = {

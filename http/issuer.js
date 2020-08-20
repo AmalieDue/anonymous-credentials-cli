@@ -1,16 +1,19 @@
 const { Issuer } = require('anon-creds')
 const fs = require('fs')
 
-class IssuerHTTP {
-  constructor (storage, verifierEndpoint) {
-    this.issuer = new Issuer(storage)
-    this.verifierEndpoint = verifierEndpoint
+class IssuerHTTP extends Issuer {
+  constructor (storage, endpoint) {
+    super(storage)
+
+    this.endpoint = endpoint
   }
 
   addCertification (schema, cb) {
-    this.issuer.addCertification(schema, (cb) => {
-      fs.writeFile('certId.json', cb, (err) => {
+    super.addCertification(schema, (certId) => {
+      fs.writeFile('certId.json', certId, (err) => {
         if (err) return cb(err)
+
+        cb(null, certId)
       })
     })
   }

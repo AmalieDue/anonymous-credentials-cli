@@ -1,127 +1,92 @@
 #! /usr/bin/env node
-const get = require('simple-get')
 const fs = require('fs')
-const anon_creds = require('anon-creds')
+const UserHTTP = require('./http/user.js')
 
 const args = require('minimist')(process.argv.slice(2), {
-    string: [
-        'host'
-    ],
-    boolean: [
-        'help'
-    ],
-    alias: {
-        h: 'help',
-        H: 'host'
-    },
-    default: {}
+  string: [
+    'host'
+  ],
+  boolean: [
+    'help'
+  ],
+  alias: {
+    h: 'help',
+    H: 'host'
+  },
+  default: {}
 })
 
 if (args.help) {
-    console.error(`client - interact with issuer and verifier servers
+  console.error(`client - interact with issuer and verifier servers
 
-usage: client -h 
+usage: client -h
 usage: client register [...options] <certificate>
 usage: client show [...options] <certificate>
 
 Options:
     -h, --help      Show help message
 `)
-    process.exit(0)
+  process.exit(0)
 }
 
 const command = args._[0]
 
 switch (command) {
-    case 'register': register(); break;
-    case 'show': show(); break;
-    default:
-        console.error('Unknown command', command)
-        process.exit(1)
+  case 'register': register(); break
+  case 'show': show(); break
+  default:
+    console.error('Unknown command', command)
+    process.exit(1)
 }
 
 function register () {
+  const user = new UserHTTP('http://localhost:8080', 'http://localhost:9999')
 
-    const user = new anon_creds.User()
+  const details = {
+    age: 66,
+    nationality: 'italy',
+    residence: 'austria',
+    'drivers license': true,
+    employed: true,
+    gender: 'male'
+  }
 
-    const details = {
-        "age": 66,
-        "nationality": "italy",
-        "residence": "austria",
-        "drivers license": true,
-        "employed": true,
-        "gender": "male"
-    }
-    
-    fs.readFile('./certId.json', function(err, contents) {
-        if (err) return console.log(err)
-        
-        const certId = contents.toString()
-        console.log('1) Issuer has created certId:', certId)
-        const app = user.apply(details, certId)
+  fs.readFile('./certId.json', (err, contents) => {
+    if (err) return console.log(err)
 
-        var options = {
-            method: 'POST',
-            url: 'http://localhost:8080/app',
-            body: app,
-            json: true
-        }
-        
-        get.concat(options, function (err, res, data) {
-            if (err) throw err
+    const certId = contents.toString()
+    console.log('1) Issuer has created certId:', certId)
 
-            console.log('3) Issuer has begun a new issuance protocol by generating a "setup" object')
-            const issuanceResponse = user.obtain(Buffer.from(data))
-            
-            var options = {
-                method: 'POST',
-                url: 'http://localhost:8080/obtain',
-                body: issuanceResponse,
-                json: true
-            }
+    user.apply(details, certId, (err, issuanceInit) => {
+      if (err) throw err
 
-            get.concat(options, function (err, res, data) {
-                if (err) throw err
+      user.obtain(Buffer.from(issuanceInit), (err, final) => {
+        if (err) throw err
 
-                console.log('5) Issuer has sent his final step during issuance, i.e. the issuer has sealed the credential by exponentiating the product of all curve points by the issuer´s secret key')
+        user.store(Buffer.from(final))
+        console.log('6) User has stored the completed credential. The completed credential can be presented to a verifier.')
 
-                const final = user.store(Buffer.from(data))
-                console.log('6) User has stored the completed credential. The completed credential can be presented to a verifier.')
-
-                fs.writeFile('storing_user', user.encode(), (err) => {
-                    if (err) return console.log(err)                        
-                })
-            })
+        fs.writeFile('storing_user', user.encode(), (err) => {
+          if (err) throw err
         })
+      })
     })
+  })
 }
 
 function show () {
-    fs.readFile('storing_user', (err, contents) => {
-        if (err) return console.log(err)
-        const user = anon_creds.User.decode(contents)
+  fs.readFile('storing_user', (err, contents) => {
+    if (err) return console.log(err)
 
-        const transcript = user.present(['age', 'nationality'])
+    const user = UserHTTP.decode('http://localhost:8080', 'http://localhost:9999', contents)
 
-        var options = {
-            method: 'POST',
-            url: 'http://localhost:9999/transcript',
-            body: transcript,
-            json: true
-        }
+    const attributes = ['age', 'nationality']
 
-        get.concat(options, function (err, res, data) {
-            if (err) throw err
-            console.log(data)
-        })
+    user.present(attributes, (err) => {
+      if (err) throw err
     })
+  })
 }
-
-//function revoke () {
-//
-//}
-
-
 
 // why use db? Store certId in global db?
 // removed revoke function
