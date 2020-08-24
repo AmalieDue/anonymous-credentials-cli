@@ -1,5 +1,7 @@
 const { User } = require('anon-creds')
 const get = require('simple-get')
+const parallel = require('run-parallel')
+const { PublicCertification } = require('anon-creds/certification')
 
 class UserHTTP extends User {
   constructor (issuerEndpoint, verifierEndpoint) {
@@ -8,8 +10,27 @@ class UserHTTP extends User {
     this.verifierEndpoint = verifierEndpoint
   }
 
-  apply (details, certId, cb) {
-    const app = super.apply(details, certId)
+  getCertifications (cb) {
+    var options = {
+      method: 'GET',
+      url: this.issuerEndpoint + '/certifications',
+      json: true
+    }
+
+    get.concat(options, (err, res, data) => {
+      if (err) return cb(err)
+
+      var certs = Object.entries(data)
+
+      for (const [certId, certInfo] of certs) {
+        var publicCert = PublicCertification.decode(Buffer.from(certInfo, 'base64'))
+        console.log(publicCert.certId, publicCert.schema)
+      }
+    })
+  }
+
+  createApplication (details, certId, cb) {
+    const app = super.createApplication(details, certId)
 
     var options = {
       method: 'POST',
@@ -68,6 +89,20 @@ class UserHTTP extends User {
     user.verifierEndpoint = verifierEndpoint
 
     return user
+  }
+
+  revoke (cb) {
+    var options = {
+      method: 'POST',
+      url: this.issuerEndpoint + '/userRevoke',
+      json: true
+    }
+
+    get.concat(options, (err, res, data) => {
+      if (err) throw err
+      console.log(data)
+      cb()
+    })
   }
 }
 

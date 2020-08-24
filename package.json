@@ -10,8 +10,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "anon-creds": "0.0.7",
+    "anon-creds": "github:hyperdivision/pairing-creds#master",
     "minimist": "^1.2.5",
+    "run-parallel": "^1.1.9",
     "simple-get": "^4.0.0"
   },
   "devDependencies": {

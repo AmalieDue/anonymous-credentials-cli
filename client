@@ -20,8 +20,10 @@ if (args.help) {
   console.error(`client - interact with issuer and verifier servers
 
 usage: client -h
+usage: client get-certifications ISSUER_HOSTNAME
 usage: client register [...options] <certificate>
 usage: client show [...options] <certificate>
+usage: client revoke [...options] <certificate>
 
 Options:
     -h, --help      Show help message
@@ -32,11 +34,21 @@ Options:
 const command = args._[0]
 
 switch (command) {
+  case 'get-certifications': getCertifications(); break
   case 'register': register(); break
   case 'show': show(); break
+  case 'revoke': revoke(); break
   default:
     console.error('Unknown command', command)
     process.exit(1)
+}
+
+function getCertifications () {
+  const user = new UserHTTP('http://localhost:8080', 'http://localhost:9999')
+
+  user.getCertifications((err) => {
+    if (err) throw err
+  })
 }
 
 function register () {
@@ -57,7 +69,7 @@ function register () {
     const certId = contents.toString()
     console.log('1) Issuer has created certId:', certId)
 
-    user.apply(details, certId, (err, issuanceInit) => {
+    user.createApplication(details, certId, (err, issuanceInit) => {
       if (err) throw err
 
       user.obtain(Buffer.from(issuanceInit), (err, final) => {
@@ -66,7 +78,7 @@ function register () {
         user.store(Buffer.from(final))
         console.log('6) User has stored the completed credential. The completed credential can be presented to a verifier.')
 
-        fs.writeFile('storing_user', user.encode(), (err) => {
+        fs.writeFile('userEncoded', user.encode(), (err) => {
           if (err) throw err
         })
       })
@@ -75,7 +87,7 @@ function register () {
 }
 
 function show () {
-  fs.readFile('storing_user', (err, contents) => {
+  fs.readFile('userEncoded', (err, contents) => {
     if (err) return console.log(err)
 
     const user = UserHTTP.decode('http://localhost:8080', 'http://localhost:9999', contents)
@@ -84,11 +96,24 @@ function show () {
 
     user.present(attributes, (err) => {
       if (err) throw err
+
+      fs.writeFile('userEncoded', user.encode(), (err) => {
+        if (err) throw err
+      })
+    })
+  })
+}
+
+function revoke () {
+  fs.readFile('userEncoded', (err, contents) => {
+    if (err) return console.log(err)
+
+    const user = UserHTTP.decode('http://localhost:8080', 'http://localhost:9999', contents)
+
+    user.revoke((err) => {
+      if (err) throw err
     })
   })
 }
 
 // why use db? Store certId in global db?
-// removed revoke function
-// validate --> revoke
-// certId always the same

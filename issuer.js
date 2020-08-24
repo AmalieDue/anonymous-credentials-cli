@@ -2,7 +2,6 @@ const express = require('express')
 const IssuerHTTP = require('./http/issuer.js')
 const app = express()
 const port = 8080
-
 app.use(express.json())
 
 const schema = {
@@ -14,34 +13,41 @@ const schema = {
   gender: 'string'
 }
 
-const issuer = new IssuerHTTP('./issuer_storage', 'http://localhost:9999')
+const issuer = new IssuerHTTP('./issuer_storage')
 
-app.post('/certinfo_verifier', (req, res) => {
-  issuer.addCertification(schema, (err, cb) => {
-    if (err) throw err
-    console.log('cb', cb)
-    console.log('From verifier:', req.body) // answer verifier's request for certinfo
-    res.send(JSON.stringify(issuer.getPublicCert(cb)))
+issuer.addCertification(schema, (err) => {
+  if (err) throw err
+
+  app.listen(port, () => {
+    console.log(`Issuer server is listening on http://localhost:${port}`)
   })
 })
 
-// issuer.issuer.addCertification(schema, (cb) => {
+app.get('/certifications', (req, res) => {
+  const certificates = {}
 
-//     fs.writeFile('certId.json', cb, function (err) {
-//         if (err) return console.log(err)
-//     })
+  for (const [certId, certInfo] of issuer.getPublicCerts()) {
+    certificates[certId] = certInfo.toString('base64')
+  }
+  res.send(certificates)
+})
 
-//     app.post('/certinfo_verifier', (req, res) => {
-//         console.log('From verifier:', req.body) // answer verifier's request for certinfo
+// app.post('/certinfoVerifier', (req, res) => {
+//   res.send(issuer.getPublicCert(issuer.certifications))
 
-//         res.send(JSON.stringify(issuer.issuer.getPublicCert(cb)))
-//     })
+// })
+
+// app.post('/certinfoVerifier', (req, res) => {
+//   issuer.addCertification(schema, (err, cb) => {
+//     if (err) throw err
+//     res.send(issuer.getPublicCert(cb))
+//   })
 // })
 
 app.post('/app', (req, res) => {
   console.log('2) User has sent an application for a credential')
 
-  res.send(JSON.stringify(issuer.addIssuance(Buffer.from(req.body))))
+  res.send(JSON.stringify(issuer.beginIssuance(Buffer.from(req.body))))
 })
 
 app.post('/obtain', (req, res) => {
@@ -51,20 +57,18 @@ app.post('/obtain', (req, res) => {
 })
 
 app.post('/identifier', (req, res) => {
-  console.log('2) Verifier has sent identifier which should be used for revocation process.')
+  console.log('2) Verifier has sent identifier which should be used in case of revocation.')
   const identifier = {
     pk: Buffer.from(req.body.pk.data),
     certId: req.body.certId
   }
 
-  // REVOKE
-  issuer.revokeCredential(identifier, (err) => {
-    if (err) throw err
-    console.log('3) user has now been revoked')
-    res.send(JSON.stringify('3) user has now been revoked'))
+  app.post('/userRevoke', (req, res) => {
+    issuer.revokeCredential(identifier, (err) => {
+      if (err) throw err
+      res.send(JSON.stringify('User has now been revoked.'))
+    })
   })
 })
 
-app.listen(port, () => {
-  console.log(`Issuer server is listening on http://localhost:${port}`)
-})
+
