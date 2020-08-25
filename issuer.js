@@ -4,7 +4,7 @@ const app = express()
 const port = 8080
 app.use(express.json())
 
-const schema = {
+const schema1 = {
   age: 'number',
   nationality: 'string',
   residence: 'string',
@@ -13,13 +13,25 @@ const schema = {
   gender: 'string'
 }
 
+const schema2 = {
+  age: 'number',
+  gender: 'string',
+  'marital status': 'string',
+  education: 'string',
+  nationality: 'string'
+}
+
 const issuer = new IssuerHTTP('./issuer_storage')
 
-issuer.addCertification(schema, (err) => {
+issuer.addCertification(schema1, (err) => {
   if (err) throw err
 
-  app.listen(port, () => {
-    console.log(`Issuer server is listening on http://localhost:${port}`)
+  issuer.addCertification(schema2, (err) => {
+    if (err) throw err
+
+    app.listen(port, () => {
+      console.log(`Issuer server is listening on http://localhost:${port}`)
+    })
   })
 })
 
@@ -32,26 +44,14 @@ app.get('/certifications', (req, res) => {
   res.send(certificates)
 })
 
-// app.post('/certinfoVerifier', (req, res) => {
-//   res.send(issuer.getPublicCert(issuer.certifications))
-
-// })
-
-// app.post('/certinfoVerifier', (req, res) => {
-//   issuer.addCertification(schema, (err, cb) => {
-//     if (err) throw err
-//     res.send(issuer.getPublicCert(cb))
-//   })
-// })
-
 app.post('/app', (req, res) => {
-  console.log('2) User has sent an application for a credential')
+  console.log('1) User has sent an application for a credential')
 
   res.send(JSON.stringify(issuer.beginIssuance(Buffer.from(req.body))))
 })
 
 app.post('/obtain', (req, res) => {
-  console.log('4) User has sent his contribution in the issuance protocol, i.e. the user has generated random scalars used to exponentiate the blinded curve points.')
+  console.log('3) User has sent his contribution in the issuance protocol, i.e. the user has generated random scalars used to exponentiate the blinded curve points.')
 
   res.send(JSON.stringify(issuer.grantCredential(Buffer.from(req.body))))
 })
@@ -70,5 +70,3 @@ app.post('/identifier', (req, res) => {
     })
   })
 })
-
-

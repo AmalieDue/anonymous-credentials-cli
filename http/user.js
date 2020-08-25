@@ -1,6 +1,6 @@
 const { User } = require('anon-creds')
 const get = require('simple-get')
-const parallel = require('run-parallel')
+const fs = require('fs')
 const { PublicCertification } = require('anon-creds/certification')
 
 class UserHTTP extends User {
@@ -22,10 +22,19 @@ class UserHTTP extends User {
 
       var certs = Object.entries(data)
 
-      for (const [certId, certInfo] of certs) {
-        var publicCert = PublicCertification.decode(Buffer.from(certInfo, 'base64'))
-        console.log(publicCert.certId, publicCert.schema)
-      }
+      fs.writeFile('certs.json', '', (err) => {
+        if (err) return cb(err)
+
+        for (const [certId, certInfo] of certs) {
+          var publicCert = PublicCertification.decode(Buffer.from(certInfo, 'base64'))
+          console.log(publicCert.certId, publicCert.schema)
+
+          fs.appendFile('certs.json', publicCert.certId + '\n', (err) => {
+            if (err) return cb(err)
+            cb()
+          })
+        }
+      })
     })
   }
 
@@ -42,7 +51,7 @@ class UserHTTP extends User {
     get.concat(options, (err, res, data) => {
       if (err) return cb(err)
 
-      console.log('3) Issuer has begun a new issuance protocol by generating a "setup" object')
+      console.log('2) Issuer has begun a new issuance protocol by generating a "setup" object')
       cb(null, data)
     })
   }
@@ -60,7 +69,7 @@ class UserHTTP extends User {
     get.concat(options, (err, res, data) => {
       if (err) return cb(err)
 
-      console.log('5) Issuer has sent his final step during issuance, i.e. the issuer has sealed the credential by exponentiating the product of all curve points by the issuer´s secret key.')
+      console.log('4) Issuer has sent his final step during issuance, i.e. the issuer has sealed the credential by exponentiating the product of all curve points by the issuer´s secret key.')
       cb(null, data)
     })
   }
@@ -99,7 +108,7 @@ class UserHTTP extends User {
     }
 
     get.concat(options, (err, res, data) => {
-      if (err) throw err
+      if (err) return cb(err)
       console.log(data)
       cb()
     })

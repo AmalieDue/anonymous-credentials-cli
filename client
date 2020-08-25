@@ -4,7 +4,9 @@ const UserHTTP = require('./http/user.js')
 
 const args = require('minimist')(process.argv.slice(2), {
   string: [
-    'host'
+    'host',
+    'ISSUER_HOSTNAME',
+    'attributes'
   ],
   boolean: [
     'help'
@@ -44,39 +46,52 @@ switch (command) {
 }
 
 function getCertifications () {
-  const user = new UserHTTP('http://localhost:8080', 'http://localhost:9999')
+  if (!args.ISSUER_HOSTNAME) {
+    console.log('Undefined ISSUER_HOSTNAME')
+    process.exit()
+  }
+
+  var issuerEndpoint = args.ISSUER_HOSTNAME
+
+  const user = new UserHTTP(issuerEndpoint, 'http://localhost:9999')
 
   user.getCertifications((err) => {
     if (err) throw err
+
+    fs.writeFile('userEncoded', user.encode(), (err) => {
+      if (err) throw err
+    })
   })
 }
 
 function register () {
-  const user = new UserHTTP('http://localhost:8080', 'http://localhost:9999')
-
-  const details = {
-    age: 66,
-    nationality: 'italy',
-    residence: 'austria',
-    'drivers license': true,
-    employed: true,
-    gender: 'male'
+  if (!args.certId) {
+    console.log('Undefined certId')
+    process.exit()
   }
 
-  fs.readFile('./certId.json', (err, contents) => {
+  fs.readFile('userEncoded', (err, contents) => {
     if (err) return console.log(err)
 
-    const certId = contents.toString()
-    console.log('1) Issuer has created certId:', certId)
+    const user = UserHTTP.decode('http://localhost:8080', 'http://localhost:9999', contents)
 
-    user.createApplication(details, certId, (err, issuanceInit) => {
+    const details = {
+      age: 66,
+      nationality: 'italy',
+      residence: 'austria',
+      'drivers license': true,
+      employed: true,
+      gender: 'male'
+    }
+
+    user.createApplication(details, args.certId, (err, issuanceInit) => {
       if (err) throw err
 
       user.obtain(Buffer.from(issuanceInit), (err, final) => {
         if (err) throw err
 
         user.store(Buffer.from(final))
-        console.log('6) User has stored the completed credential. The completed credential can be presented to a verifier.')
+        console.log('5) User has stored the completed credential. The completed credential can be presented to a verifier.')
 
         fs.writeFile('userEncoded', user.encode(), (err) => {
           if (err) throw err
@@ -87,18 +102,24 @@ function register () {
 }
 
 function show () {
+  if (!args.attributes) {
+    console.log('Missing attributes')
+    process.exit()
+  }
+
+  const attributes = args.attributes.toString().split(',')
+
   fs.readFile('userEncoded', (err, contents) => {
     if (err) return console.log(err)
 
     const user = UserHTTP.decode('http://localhost:8080', 'http://localhost:9999', contents)
-
-    const attributes = ['age', 'nationality']
 
     user.present(attributes, (err) => {
       if (err) throw err
 
       fs.writeFile('userEncoded', user.encode(), (err) => {
         if (err) throw err
+        console.log('user has been encoded')
       })
     })
   })
@@ -115,5 +136,3 @@ function revoke () {
     })
   })
 }
-
-// why use db? Store certId in global db?

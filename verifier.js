@@ -15,10 +15,9 @@ verifier.registerCertifications((err) => {
   })
 })
 
-
 app.post('/transcript', (req, res) => {
   console.log('1) User has sent a transcript showing a valid credential, only disclosing some properties.')
-  res.send(JSON.stringify('1) verifier got transcript'))
+  res.send(JSON.stringify('ok'))
 
   verifier.validate(Buffer.from(req.body), (err) => {
     if (err) throw err

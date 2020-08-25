@@ -8,24 +8,6 @@ class VerifierHTTP extends Verifier {
     this.issuerEndpoint = issuerEndpoint
   }
 
-  // getCertifications (cb) {
-  //   var options = {
-  //     method: 'GET',
-  //     url: this.issuerEndpoint + '/certifications',
-  //     json: true
-  //   }
-
-  //   get.concat(options, (err, res, data) => {
-  //     if (err) return cb(err)
-  //     console.log('certifications:', data)
-
-  //     // super.registerCertification(Buffer.from(data), (err) => {
-  //     //   cb(err)
-  //     // })
-  //     cb()
-  //   })
-  // }
-
   registerCertifications (cb) {
     var options = {
       method: 'GET',
