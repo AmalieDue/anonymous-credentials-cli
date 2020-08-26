@@ -1,19 +1,21 @@
 #! /usr/bin/env node
 const fs = require('fs')
+const path = require('path')
 const UserHTTP = require('./http/user.js')
 
 const args = require('minimist')(process.argv.slice(2), {
   string: [
     'host',
-    'ISSUER_HOSTNAME',
-    'attributes'
+    'attributes',
+    'application'
   ],
   boolean: [
     'help'
   ],
   alias: {
     h: 'help',
-    H: 'host'
+    H: 'host',
+    a: 'application'
   },
   default: {}
 })
@@ -22,10 +24,10 @@ if (args.help) {
   console.error(`client - interact with issuer and verifier servers
 
 usage: client -h
-usage: client get-certifications ISSUER_HOSTNAME
-usage: client register [...options] <certificate>
-usage: client show [...options] <certificate>
-usage: client revoke [...options] <certificate>
+usage: client get-certifications <issuer-hostname>
+usage: client register application <certificateId>
+usage: client show attributes <certificateId>
+usage: client revoke <certificateId>
 
 Options:
     -h, --help      Show help message
@@ -46,14 +48,13 @@ switch (command) {
 }
 
 function getCertifications () {
-  if (!args.ISSUER_HOSTNAME) {
-    console.log('Undefined ISSUER_HOSTNAME')
-    process.exit()
+  const issuerHostname = args._[1]
+  if (issuerHostname == null) {
+    console.error('<issuer-hostname> must be provided')
+    process.exit(1)
   }
 
-  var issuerEndpoint = args.ISSUER_HOSTNAME
-
-  const user = new UserHTTP(issuerEndpoint, 'http://localhost:9999')
+  const user = new UserHTTP(issuerHostname, 'http://localhost:9999')
 
   user.getCertifications((err) => {
     if (err) throw err
@@ -65,26 +66,32 @@ function getCertifications () {
 }
 
 function register () {
-  if (!args.certId) {
-    console.log('Undefined certId')
-    process.exit()
-  }
-
   fs.readFile('userEncoded', (err, contents) => {
     if (err) return console.log(err)
 
     const user = UserHTTP.decode('http://localhost:8080', 'http://localhost:9999', contents)
 
-    const details = {
-      age: 66,
-      nationality: 'italy',
-      residence: 'austria',
-      'drivers license': true,
-      employed: true,
-      gender: 'male'
+    const certId = args._[1]
+    if (certId == null) {
+      console.error('<certificateId> must be provided')
+      process.exit(1)
     }
 
-    user.createApplication(details, args.certId, (err, issuanceInit) => {
+    if (!isCertId(certId)) {
+      console.error('wrong certId')
+      process.exit(1)
+    }
+
+    if (args.application === '') {
+      console.error('--application must be provided')
+      process.exit(1)
+    }
+
+    var applicationPath = path.resolve(args.application)
+
+    const details = JSON.parse(fs.readFileSync(applicationPath, 'utf8'))
+
+    user.createApplication(details, certId, (err, issuanceInit) => {
       if (err) throw err
 
       user.obtain(Buffer.from(issuanceInit), (err, final) => {
@@ -102,9 +109,20 @@ function register () {
 }
 
 function show () {
+  const certId = args._[1]
+  if (certId == null) {
+    console.error('<certificateId> must be provided')
+    process.exit(1)
+  }
+
+  if (!isCertId(certId)) {
+    console.error('wrong certId')
+    process.exit(1)
+  }
+
   if (!args.attributes) {
-    console.log('Missing attributes')
-    process.exit()
+    console.log('--attributes must be provided')
+    process.exit(1)
   }
 
   const attributes = args.attributes.toString().split(',')
@@ -114,25 +132,44 @@ function show () {
 
     const user = UserHTTP.decode('http://localhost:8080', 'http://localhost:9999', contents)
 
-    user.present(attributes, (err) => {
+    user.present(attributes, certId, (err) => {
       if (err) throw err
 
       fs.writeFile('userEncoded', user.encode(), (err) => {
         if (err) throw err
-        console.log('user has been encoded')
       })
     })
   })
 }
 
 function revoke () {
+  const certId = args._[1]
+
+  console.log(certId)
+  if (certId == null) {
+    console.error('<certificateId> must be provided')
+    process.exit(1)
+  }
+
+  if (!isCertId(certId)) {
+    console.error('wrong certId')
+    process.exit(1)
+  }
+
   fs.readFile('userEncoded', (err, contents) => {
     if (err) return console.log(err)
 
     const user = UserHTTP.decode('http://localhost:8080', 'http://localhost:9999', contents)
 
-    user.revoke((err) => {
+    user.revoke(certId, (err) => {
       if (err) throw err
     })
   })
+}
+
+function isCertId (certId) {
+  if (certId.length !== 64) return false
+  if (/[a-fA-F0-9]{64}/.test(certId) === false) return false
+
+  return true
 }

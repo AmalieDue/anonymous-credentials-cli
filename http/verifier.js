@@ -2,6 +2,8 @@ const get = require('simple-get')
 const parallel = require('run-parallel')
 const { Verifier } = require('anon-creds')
 
+const db = new Map()
+
 class VerifierHTTP extends Verifier {
   constructor (storage, issuerEndpoint) {
     super(storage)
@@ -37,18 +39,21 @@ class VerifierHTTP extends Verifier {
     super.validate(transcript, (err, identifier) => {
       if (err) return cb(err)
 
-      var options = {
-        method: 'POST',
-        url: this.issuerEndpoint + '/identifier',
-        body: identifier,
-        json: true
-      }
+      db.set(transcript.certId, identifier)
+      cb()
 
-      get.concat(options, (err, res, data) => {
-        if (err) return cb(err)
-        console.log(data)
-        cb()
-      })
+      // var options = {
+      //   method: 'POST',
+      //   url: this.issuerEndpoint + '/identifier',
+      //   body: identifier,
+      //   json: true
+      // }
+
+      // get.concat(options, (err, res, data) => {
+      //   if (err) return cb(err)
+      //   console.log(data)
+      //   cb()
+      // })
     })
   }
 }

@@ -56,17 +56,22 @@ app.post('/obtain', (req, res) => {
   res.send(JSON.stringify(issuer.grantCredential(Buffer.from(req.body))))
 })
 
-app.post('/identifier', (req, res) => {
-  console.log('2) Verifier has sent identifier which should be used in case of revocation.')
-  const identifier = {
-    pk: Buffer.from(req.body.pk.data),
-    certId: req.body.certId
-  }
+// app.post('/identifier', (req, res) => {
+//   console.log('2) Verifier has sent identifier which should be used in case of revocation.')
+//   const identifier = {
+//     pk: Buffer.from(req.body.pk.data),
+//     certId: req.body.certId
+//   }
+// })
 
-  app.post('/userRevoke', (req, res) => {
-    issuer.revokeCredential(identifier, (err) => {
-      if (err) throw err
-      res.send(JSON.stringify('User has now been revoked.'))
-    })
+app.post('/userRevoke', (req, res) => {
+  const identifier = req.body
+  console.log(req.body)
+  req.body.root = Buffer.from(req.body.root, 'hex')
+  console.log(issuer.certifications[identifier.certId].credentials)
+  issuer.revokeCredential(identifier, (err) => {
+    if (err) throw err
+    console.log('User has now been revoked from certificationId:', req.body.certId)
+    res.send(JSON.stringify('User has now been revoked'))
   })
 })

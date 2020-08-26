@@ -1,6 +1,5 @@
 const { User } = require('anon-creds')
 const get = require('simple-get')
-const fs = require('fs')
 const { PublicCertification } = require('anon-creds/certification')
 
 class UserHTTP extends User {
@@ -22,19 +21,11 @@ class UserHTTP extends User {
 
       var certs = Object.entries(data)
 
-      fs.writeFile('certs.json', '', (err) => {
-        if (err) return cb(err)
-
-        for (const [certId, certInfo] of certs) {
-          var publicCert = PublicCertification.decode(Buffer.from(certInfo, 'base64'))
-          console.log(publicCert.certId, publicCert.schema)
-
-          fs.appendFile('certs.json', publicCert.certId + '\n', (err) => {
-            if (err) return cb(err)
-            cb()
-          })
-        }
-      })
+      for (const [certId, certInfo] of certs) {
+        var publicCert = PublicCertification.decode(Buffer.from(certInfo, 'base64'))
+        console.log('certificateId:', certId, 'schema:', publicCert.schema)
+        cb()
+      }
     })
   }
 
@@ -74,8 +65,8 @@ class UserHTTP extends User {
     })
   }
 
-  present (attributes, cb) {
-    const transcript = super.present(attributes)
+  present (attributes, certId, cb) {
+    const transcript = super.present(attributes, certId)
 
     var options = {
       method: 'POST',
@@ -86,7 +77,6 @@ class UserHTTP extends User {
 
     get.concat(options, (err, res, data) => {
       if (err) return cb(err)
-      console.log(data)
       cb()
     })
   }
@@ -100,11 +90,19 @@ class UserHTTP extends User {
     return user
   }
 
-  revoke (cb) {
+  revoke (certId, cb) {
+    const id = this.getIdentity(certId)
+
+    const identifier = {
+      root: id.pseudonym.root.toString('hex'),
+      certId
+    }
+
     var options = {
       method: 'POST',
       url: this.issuerEndpoint + '/userRevoke',
-      json: true
+      json: true,
+      body: identifier
     }
 
     get.concat(options, (err, res, data) => {
