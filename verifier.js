@@ -1,15 +1,23 @@
 const express = require('express')
 const VerifierHTTP = require('./http/verifier.js')
+const concat = require('concat-stream')
 
 var app = express()
 const port = 9999
 
 app.use(express.json())
+app.use(function (req, res, next) {
+  req.pipe(concat(function (data) {
+    req.body = data
+    next()
+  }))
+})
 
 const verifier = new VerifierHTTP('./verifier_storage', 'http://localhost:8080')
 
 verifier.registerCertifications((err) => {
   if (err) throw err
+  console.log(verifier.certifications)
   app.listen(port, () => {
     console.log(`Verifier server is listening on http://localhost:${port}`)
   })

@@ -10,7 +10,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "anon-creds": "0.0.10",
+    "anon-creds": "0.0.12",
+    "concat-stream": "^2.0.0",
     "minimist": "^1.2.5",
     "run-parallel": "^1.1.9",
     "simple-get": "^4.0.0"

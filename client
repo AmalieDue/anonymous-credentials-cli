@@ -15,7 +15,8 @@ const args = require('minimist')(process.argv.slice(2), {
   alias: {
     h: 'help',
     H: 'host',
-    a: 'application'
+    a: 'application',
+    r: 'remove'
   },
   default: {}
 })
@@ -25,13 +26,31 @@ if (args.help) {
 
 usage: client -h
 usage: client get-certifications <issuer-hostname>
-usage: client register application <certificateId>
-usage: client show attributes <certificateId>
+usage: client register --application <certificateId>
+usage: client show --attributes <certificateId>
 usage: client revoke <certificateId>
+usage: client delete
 
 Options:
-    -h, --help      Show help message
-`)
+    -h, --help         Show help message
+    -a, --application  Handle the specific application in json file, e.g. application.json. See an example of an application below
+    --attributes       The attributes, i.e. some of the properties in the application, that are disclosed for validation
+    -r, --remove       Remove current user
+
+Examples:
+    In case some certification listed by the issuer server contains the attributes "age", "nationality", "residence", "drivers license", "employed", and "gender", a valid application file could be:
+
+    cat application.json:
+
+    {
+      "age": 21,
+      "nationality": "Danish",
+      "residence": "Denmark",
+      "drivers license": true,
+      "employed": true,
+      "gender": "f"
+    }
+    `)
   process.exit(0)
 }
 
@@ -42,73 +61,27 @@ switch (command) {
   case 'register': register(); break
   case 'show': show(); break
   case 'revoke': revoke(); break
+  case 'remove': remove(); break
   default:
     console.error('Unknown command', command)
     process.exit(1)
 }
 
 function getCertifications () {
-  const issuerHostname = args._[1]
-  if (issuerHostname == null) {
-    console.error('<issuer-hostname> must be provided')
-    process.exit(1)
-  }
-
-  const user = new UserHTTP(issuerHostname, 'http://localhost:9999')
-
-  user.getCertifications((err) => {
+  getUser((err, user) => {
     if (err) throw err
 
-    fs.writeFile('userEncoded', user.encode(), (err) => {
-      if (err) throw err
-    })
-  })
-}
-
-function register () {
-  fs.readFile('userEncoded', (err, contents) => {
-    if (err) return console.log(err)
-
-    const user = UserHTTP.decode('http://localhost:8080', 'http://localhost:9999', contents)
-
-    const certId = args._[1]
-    if (certId == null) {
-      console.error('<certificateId> must be provided')
-      process.exit(1)
-    }
-
-    if (!isCertId(certId)) {
-      console.error('wrong certId')
-      process.exit(1)
-    }
-
-    if (args.application === '') {
-      console.error('--application must be provided')
-      process.exit(1)
-    }
-
-    var applicationPath = path.resolve(args.application)
-
-    const details = JSON.parse(fs.readFileSync(applicationPath, 'utf8'))
-
-    user.createApplication(details, certId, (err, issuanceInit) => {
+    user.getCertifications((err) => {
       if (err) throw err
 
-      user.obtain(Buffer.from(issuanceInit), (err, final) => {
+      save(user, (err) => {
         if (err) throw err
-
-        user.store(Buffer.from(final))
-        console.log('5) User has stored the completed credential. The completed credential can be presented to a verifier.')
-
-        fs.writeFile('userEncoded', user.encode(), (err) => {
-          if (err) throw err
-        })
       })
     })
   })
 }
 
-function show () {
+function register () {
   const certId = args._[1]
   if (certId == null) {
     console.error('<certificateId> must be provided')
@@ -120,6 +93,41 @@ function show () {
     process.exit(1)
   }
 
+  if (args.application === '') {
+    console.error('--application must be provided')
+    process.exit(1)
+  }
+
+  if (!args.application.endsWith('.json')) {
+    console.error('application must be a json file')
+    process.exit(1)
+  }
+
+  var applicationPath = path.resolve(args.application)
+
+  const details = JSON.parse(fs.readFileSync(applicationPath, 'utf8'))
+
+  getUser((err, user) => {
+    if (err) throw err
+
+    user.createApplication(details, certId, (err, issuanceInit) => {
+      if (err) throw err
+
+      user.obtain(issuanceInit, (err, final) => {
+        if (err) throw err
+
+        user.store(Buffer.from(final))
+        console.log('5) User has stored the completed credential. The completed credential can be presented to a verifier.')
+        console.log(user.getAttributes())
+        save(user, (err) => {
+          if (err) throw err
+        })
+      })
+    })
+  })
+}
+
+function show () {
   if (!args.attributes) {
     console.log('--attributes must be provided')
     process.exit(1)
@@ -127,15 +135,13 @@ function show () {
 
   const attributes = args.attributes.toString().split(',')
 
-  fs.readFile('userEncoded', (err, contents) => {
-    if (err) return console.log(err)
+  getUser((err, user) => {
+    if (err) throw err
 
-    const user = UserHTTP.decode('http://localhost:8080', 'http://localhost:9999', contents)
-
-    user.present(attributes, certId, (err) => {
+    user.present(attributes, (err) => {
       if (err) throw err
 
-      fs.writeFile('userEncoded', user.encode(), (err) => {
+      save(user, (err) => {
         if (err) throw err
       })
     })
@@ -156,15 +162,39 @@ function revoke () {
     process.exit(1)
   }
 
-  fs.readFile('userEncoded', (err, contents) => {
-    if (err) return console.log(err)
-
-    const user = UserHTTP.decode('http://localhost:8080', 'http://localhost:9999', contents)
+  getUser((err, user) => {
+    if (err) throw err
 
     user.revoke(certId, (err) => {
       if (err) throw err
     })
   })
+}
+
+function getUser (cb) {
+  fs.readFile('userEncoded', (err, contents) => {
+    if (err) {
+      if (err.code === 'ENOENT') {
+        const user = new UserHTTP('http://localhost:8080', 'http://localhost:9999')
+        return cb(null, user)
+      } else {
+        return cb(err)
+      }
+    }
+    const user = UserHTTP.decode('http://localhost:8080', 'http://localhost:9999', contents)
+    cb(null, user)
+  })
+}
+
+function save (user, cb) {
+  fs.writeFile('userEncoded', user.encode(), (err) => {
+    if (err) throw err
+    cb()
+  })
+}
+
+function remove () {
+  fs.unlinkSync('userEncoded')
 }
 
 function isCertId (certId) {

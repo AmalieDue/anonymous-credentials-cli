@@ -9,6 +9,14 @@ class UserHTTP extends User {
     this.verifierEndpoint = verifierEndpoint
   }
 
+  getAttributes () {
+    console.log(this.identities[0].attributes)
+    return this.identities.reduce((acc, id) => {
+      for (let attr of Object.keys(id.attributes)) acc.add(attr)
+      return acc
+    }, new Set())
+  }
+
   getCertifications (cb) {
     var options = {
       method: 'GET',
@@ -23,7 +31,8 @@ class UserHTTP extends User {
 
       for (const [certId, certInfo] of certs) {
         var publicCert = PublicCertification.decode(Buffer.from(certInfo, 'base64'))
-        console.log('certificateId:', certId, 'schema:', publicCert.schema)
+
+        console.log(JSON.stringify({ certificateId: certId, schema: publicCert.schema }))
         cb()
       }
     })
@@ -35,8 +44,7 @@ class UserHTTP extends User {
     var options = {
       method: 'POST',
       url: this.issuerEndpoint + '/app',
-      body: app,
-      json: true
+      body: app
     }
 
     get.concat(options, (err, res, data) => {
@@ -53,8 +61,7 @@ class UserHTTP extends User {
     var options = {
       method: 'POST',
       url: this.issuerEndpoint + '/obtain',
-      body: issuanceResponse,
-      json: true
+      body: issuanceResponse
     }
 
     get.concat(options, (err, res, data) => {
@@ -66,13 +73,13 @@ class UserHTTP extends User {
   }
 
   present (attributes, certId, cb) {
+    if (typeof certId === 'function') return this.present(attributes, null, certId)
     const transcript = super.present(attributes, certId)
 
     var options = {
       method: 'POST',
       url: this.verifierEndpoint + '/transcript',
-      body: transcript,
-      json: true
+      body: transcript
     }
 
     get.concat(options, (err, res, data) => {
@@ -107,7 +114,6 @@ class UserHTTP extends User {
 
     get.concat(options, (err, res, data) => {
       if (err) return cb(err)
-      console.log(data)
       cb()
     })
   }

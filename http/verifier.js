@@ -39,13 +39,15 @@ class VerifierHTTP extends Verifier {
     super.validate(transcript, (err, identifier) => {
       if (err) return cb(err)
 
-      db.set(transcript.certId, identifier)
-      cb()
+      console.log(identifier)
 
+      db.set(identifier.certId, identifier)
+
+      // IF ISSUER WANTS TO REVOKE
       // var options = {
       //   method: 'POST',
-      //   url: this.issuerEndpoint + '/identifier',
-      //   body: identifier,
+      //   url: this.issuerEndpoint + '/issuerRevoke',
+      //   body: db.get(identifier.certId),
       //   json: true
       // }
 
@@ -54,6 +56,7 @@ class VerifierHTTP extends Verifier {
       //   console.log(data)
       //   cb()
       // })
+      cb()
     })
   }
 }
